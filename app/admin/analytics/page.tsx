@@ -314,9 +314,10 @@ export default async function AnalyticsPage() {
 
           {methodBars.length > 0 ? (
             <SimpleBarChart
-              bars={methodBars}
-              color="#465bdc"
-            />
+  bars={methodBars}
+  color="#465bdc"
+  total={totalCount}
+/>
           ) : (
             <div
               style={{
@@ -369,9 +370,10 @@ export default async function AnalyticsPage() {
 
           {farmerBars.length > 0 ? (
             <SimpleBarChart
-              bars={farmerBars}
-              color="#159447"
-            />
+  bars={farmerBars}
+  color="#159447"
+  total={totalCount}
+/>
           ) : (
             <div
               style={{
