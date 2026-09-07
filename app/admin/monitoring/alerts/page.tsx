@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -19,7 +19,7 @@ type Alert = {
   fermentation_batches?: { batch_code: string } | null;
 };
 
-export default function Page() {
+function AlertsContent() {
   const supabase = createClient();
   const searchParams = useSearchParams();
 
@@ -69,11 +69,7 @@ export default function Page() {
   }, [activeFilter]);
 
   // Realtime: any insert/update on the alerts table re-fetches the
-  // currently filtered list. We re-fetch (instead of patching state
-  // in place) because a new/changed alert can affect which filter
-  // bucket it belongs in (e.g. active -> resolved), and because the
-  // joined fermentation_batches.batch_code isn't included in the
-  // realtime payload itself.
+  // currently filtered list.
   useEffect(() => {
     const channel = supabase
       .channel("alerts-page")
@@ -109,7 +105,11 @@ export default function Page() {
 
       <div
         className="card"
-        style={{ marginBottom: "1rem", display: "flex", gap: "0.5rem" }}
+        style={{
+          marginBottom: "1rem",
+          display: "flex",
+          gap: "0.5rem",
+        }}
       >
         <FilterLink current={activeFilter} value="active" label="Active" />
         <FilterLink current={activeFilter} value="resolved" label="Resolved" />
@@ -151,22 +151,31 @@ export default function Page() {
                 <th style={{ padding: "0.5rem" }}>Resolved</th>
               </tr>
             </thead>
+
             <tbody>
               {alerts.map((alert) => (
                 <tr
                   key={alert.id}
-                  style={{ borderBottom: "1px solid var(--color-border)" }}
+                  style={{
+                    borderBottom: "1px solid var(--color-border)",
+                  }}
                 >
-                  <td style={{ padding: "0.5rem" }}>{alert.alert_type}</td>
+                  <td style={{ padding: "0.5rem" }}>
+                    {alert.alert_type}
+                  </td>
+
                   <td style={{ padding: "0.5rem" }}>
                     {alert.temperature_value ?? "—"}
                   </td>
+
                   <td style={{ padding: "0.5rem" }}>
                     {alert.ph_value ?? "—"}
                   </td>
+
                   <td style={{ padding: "0.5rem" }}>
                     {alert.humidity_value ?? "—"}
                   </td>
+
                   <td style={{ padding: "0.5rem" }}>
                     <span
                       style={{
@@ -186,9 +195,11 @@ export default function Page() {
                       {alert.status}
                     </span>
                   </td>
+
                   <td style={{ padding: "0.5rem" }}>
                     {alert.fermentation_batches?.batch_code ?? "—"}
                   </td>
+
                   <td
                     style={{
                       padding: "0.5rem",
@@ -198,9 +209,11 @@ export default function Page() {
                   >
                     {alert.sensor_id.slice(0, 8)}…
                   </td>
+
                   <td style={{ padding: "0.5rem" }}>
                     {new Date(alert.created_at).toLocaleString()}
                   </td>
+
                   <td style={{ padding: "0.5rem" }}>
                     {alert.resolved_at
                       ? new Date(alert.resolved_at).toLocaleString()
@@ -213,6 +226,14 @@ export default function Page() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AlertsContent />
+    </Suspense>
   );
 }
 
@@ -236,7 +257,9 @@ function FilterLink({
         borderRadius: "6px",
         fontSize: "0.85rem",
         textDecoration: "none",
-        background: isActive ? "var(--color-primary, #6d28d9)" : "transparent",
+        background: isActive
+          ? "var(--color-primary, #6d28d9)"
+          : "transparent",
         color: isActive ? "white" : "var(--color-text-muted)",
       }}
     >
