@@ -24,7 +24,7 @@ export default function ForgotPasswordPage() {
 
     const { error: resetError } =
       await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: `${window.location.origin}/auth/confirm?next=/reset-password`,
+        redirectTo: `https://cacaosense.vercel.app/auth/confirm?next=/reset-password`,
       });
 
     setLoading(false);
