@@ -12,19 +12,29 @@ export default function ForgotPasswordPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
     setError(null);
+    setSent(false);
     setLoading(true);
 
     const supabase = createClient();
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/confirm?next=/reset-password`,
-    });
+
+    // Clean the email before sending it to Supabase
+    const cleanEmail = email.trim().toLowerCase();
+
+    const { error: resetError } =
+      await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo: `${window.location.origin}/auth/confirm?next=/reset-password`,
+      });
 
     setLoading(false);
+
     if (resetError) {
+      console.error("Reset password error:", resetError);
       setError(resetError.message);
       return;
     }
+
     setSent(true);
   }
 
@@ -37,6 +47,7 @@ export default function ForgotPasswordPage() {
       </div>
 
       <div className="auth-card">
+        {/* LEFT PANEL */}
         <div
           className="auth-image-panel"
           style={{
@@ -45,6 +56,7 @@ export default function ForgotPasswordPage() {
           }}
         >
           <div className="auth-image-overlay" />
+
           <div className="panel-blob panel-blob-1" />
           <div className="panel-blob panel-blob-2" />
 
@@ -55,9 +67,13 @@ export default function ForgotPasswordPage() {
             </div>
 
             <div className="auth-hero-text">
-              <h2 className="auth-hero-title">No worries, we've got you</h2>
+              <h2 className="auth-hero-title">
+                No worries, we've got you
+              </h2>
+
               <p className="auth-hero-subtitle">
-                We'll help you get back into your account in just a couple of steps.
+                We'll help you get back into your account in just a
+                couple of steps.
               </p>
             </div>
 
@@ -67,24 +83,40 @@ export default function ForgotPasswordPage() {
           </div>
         </div>
 
+        {/* RIGHT PANEL */}
         <div className="auth-form-panel">
           <div className="auth-form-inner">
             <h1>Forgot password?</h1>
+
             <p className="auth-form-subtitle">
               Enter your email and we'll send you a reset link.
             </p>
 
-            {error && <div className="form-error">{error}</div>}
-            {sent && (
-              <div className="form-success">Check your email for a reset link.</div>
+            {/* ERROR MESSAGE */}
+            {error && (
+              <div className="form-error">
+                {error}
+              </div>
             )}
 
+            {/* SUCCESS MESSAGE */}
+            {sent && (
+              <div className="form-success">
+                Check your email for a reset link.
+              </div>
+            )}
+
+            {/* FORM */}
             {!sent && (
               <form onSubmit={handleSubmit}>
                 <div className="field-group">
-                  <label className="field-label" htmlFor="email">
+                  <label
+                    className="field-label"
+                    htmlFor="email"
+                  >
                     Email
                   </label>
+
                   <div className="input-with-icon">
                     <input
                       id="email"
@@ -93,13 +125,20 @@ export default function ForgotPasswordPage() {
                       className="text-input"
                       placeholder="you@email.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        setError(null);
+                      }}
                       autoComplete="email"
                     />
                   </div>
                 </div>
 
-                <button type="submit" className="btn-primary" disabled={loading}>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={loading}
+                >
                   {loading ? (
                     <span className="btn-loading-content">
                       <span className="btn-spinner" />
@@ -112,8 +151,11 @@ export default function ForgotPasswordPage() {
               </form>
             )}
 
+            {/* BACK TO LOGIN */}
             <div className="auth-bottom-link">
-              <a href="/login">Back to login</a>
+              <a href="/login">
+                Back to login
+              </a>
             </div>
           </div>
         </div>
