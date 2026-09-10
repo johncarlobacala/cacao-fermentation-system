@@ -1017,37 +1017,9 @@ export default function FarmerDashboardPage() {
                 System Status
               </div>
 
-              <div className="fd-status-row">
-                <span>ESP32 Controller</span>
+              
 
-                <span
-                  className={`badge ${
-                    sensor?.status === "online"
-                      ? "badge-success"
-                      : "badge-danger"
-                  }`}
-                >
-                  {sensor
-                    ? sensor.status
-                    : "No data available"}
-                </span>
-              </div>
-
-              <div className="fd-status-row">
-                <span>Cloud Database</span>
-
-                <span
-                  className={`badge ${
-                    dbError
-                      ? "badge-danger"
-                      : "badge-success"
-                  }`}
-                >
-                  {dbError
-                    ? "Error"
-                    : "Connected"}
-                </span>
-              </div>
+            
             </div>
 
             {/* Recent Activity */}
