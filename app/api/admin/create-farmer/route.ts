@@ -4,9 +4,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: NextRequest) {
   try {
-    // ==========================================
-    // Current logged-in user
-    // ==========================================
+    // =====================================================
+    // 1. CURRENT LOGGED-IN USER
+    // =====================================================
+
     const supabase = await createClient();
 
     const {
@@ -20,31 +21,35 @@ export async function POST(request: NextRequest) {
 
     if (authError) {
       return NextResponse.json(
-        { error: authError.message },
+        {
+          error: authError.message,
+        },
         { status: 401 }
       );
     }
 
     if (!user) {
       return NextResponse.json(
-        { error: "Not authenticated." },
+        {
+          error: "Not authenticated.",
+        },
         { status: 401 }
       );
     }
 
-    // ==========================================
-    // Get current user's profile
-    // ==========================================
-    const { data: callerProfile, error: profileError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
+    // =====================================================
+    // 2. GET CURRENT USER PROFILE
+    // =====================================================
 
-    console.log("PROFILE:", callerProfile);
+    const { data: callerProfile, error: profileError } =
+      await supabase
+        .from("profiles")
+        .select("id, role, status")
+        .eq("id", user.id)
+        .single();
+
+    console.log("CALLER PROFILE:", callerProfile);
     console.log("PROFILE ERROR:", profileError);
-    console.log("USER ID:", user.id);
-    console.log("ROLE:", callerProfile?.role);
 
     if (profileError) {
       return NextResponse.json(
@@ -65,10 +70,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Allow both "admin" and "Admin"
-    if (
-      callerProfile.role?.toLowerCase() !== "admin"
-    ) {
+    // =====================================================
+    // 3. ONLY ADMIN CAN CREATE FARMER ACCOUNTS
+    // =====================================================
+
+    if (callerProfile.role?.toLowerCase() !== "admin") {
       return NextResponse.json(
         {
           error: `Only admins can create accounts. Your role is "${callerProfile.role}".`,
@@ -77,9 +83,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ==========================================
-    // Read request body
-    // ==========================================
+    // =====================================================
+    // 4. READ REQUEST BODY
+    // =====================================================
+
     const body = await request.json();
 
     const {
@@ -90,7 +97,11 @@ export async function POST(request: NextRequest) {
       farm_id,
     } = body;
 
-    if (!full_name || !email || !temporary_password) {
+    if (
+      !full_name ||
+      !email ||
+      !temporary_password
+    ) {
       return NextResponse.json(
         {
           error:
@@ -100,23 +111,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ==========================================
-    // Admin Client
-    // ==========================================
+    // =====================================================
+    // 5. CREATE SUPABASE ADMIN CLIENT
+    // =====================================================
+
     const admin = createAdminClient();
 
-    const { data: newUser, error: createError } =
+    // =====================================================
+    // 6. CREATE AUTH USER
+    // =====================================================
+
+    const { data: newUserData, error: createError } =
       await admin.auth.admin.createUser({
-        email,
+        email: email.trim().toLowerCase(),
         password: temporary_password,
         email_confirm: true,
+
+        // Metadata only.
+        // Actual role is also forced below in profiles.
         user_metadata: {
-          full_name,
+          full_name: full_name.trim(),
           role: "farmer",
+          contact_number: contact_number || "",
         },
       });
 
-    console.log("NEW USER:", newUser);
+    console.log("NEW USER:", newUserData);
     console.log("CREATE ERROR:", createError);
 
     if (createError) {
@@ -128,49 +148,129 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ==========================================
-    // Update profile
-    // ==========================================
-    const { error: updateProfileError } = await admin
-      .from("profiles")
-      .update({
-        contact_number,
-      })
-      .eq("id", newUser.user.id);
-
-    console.log("UPDATE PROFILE ERROR:", updateProfileError);
-
-    // ==========================================
-    // Assign farm (optional)
-    // ==========================================
-    if (farm_id) {
-      const { error: farmError } = await admin
-        .from("farms")
-        .update({
-          farmer_id: newUser.user.id,
-        })
-        .eq("id", farm_id);
-
-      console.log("FARM ERROR:", farmError);
+    if (!newUserData.user) {
+      return NextResponse.json(
+        {
+          error: "User was created but no user data was returned.",
+        },
+        { status: 500 }
+      );
     }
 
-    // ==========================================
-    // Success
-    // ==========================================
-    return NextResponse.json({
-      success: true,
-      user_id: newUser.user.id,
-    });
-  } catch (err: any) {
-    console.error(err);
+    const newUserId = newUserData.user.id;
+
+    console.log("NEW FARMER UID:", newUserId);
+
+    // =====================================================
+    // 7. CREATE / UPDATE PROFILE
+    // =====================================================
+    //
+    // IMPORTANT:
+    // This guarantees that the new account is a FARMER.
+    //
+    // profiles.id = auth.users.id
+    // profiles.role = farmer
+    // profiles.status = active
+    //
+    // =====================================================
+
+    const { error: profileUpsertError } =
+      await admin
+        .from("profiles")
+        .upsert(
+          {
+            id: newUserId,
+            role: "farmer",
+            full_name: full_name.trim(),
+            contact_number: contact_number || "",
+            status: "active",
+          },
+          {
+            onConflict: "id",
+          }
+        );
+
+    console.log(
+      "PROFILE UPSERT ERROR:",
+      profileUpsertError
+    );
+
+    if (profileUpsertError) {
+      // ---------------------------------------------------
+      // If profile creation fails, remove the Auth user
+      // so we don't leave an incomplete account behind.
+      // ---------------------------------------------------
+
+      console.error(
+        "Profile creation failed. Removing Auth user..."
+      );
+
+      await admin.auth.admin.deleteUser(newUserId);
+
+      return NextResponse.json(
+        {
+          error:
+            "Farmer account could not be completed.",
+          details: profileUpsertError.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    // =====================================================
+    // 8. ASSIGN FARM (OPTIONAL)
+    // =====================================================
+
+    if (farm_id) {
+      const { error: farmError } =
+        await admin
+          .from("farms")
+          .update({
+            farmer_id: newUserId,
+          })
+          .eq("id", farm_id);
+
+      console.log("FARM ERROR:", farmError);
+
+      if (farmError) {
+        return NextResponse.json(
+          {
+            success: true,
+            warning:
+              "Farmer account created, but the farm could not be assigned.",
+            user_id: newUserId,
+          },
+          { status: 200 }
+        );
+      }
+    }
+
+    // =====================================================
+    // 9. SUCCESS
+    // =====================================================
 
     return NextResponse.json(
       {
-        error: err.message,
+        success: true,
+        message: "Farmer account created successfully.",
+        user_id: newUserId,
+        role: "farmer",
       },
+      { status: 200 }
+    );
+  } catch (err: any) {
+    console.error(
+      "CREATE FARMER ERROR:",
+      err
+    );
+
+    return NextResponse.json(
       {
-        status: 500,
-      }
+        error:
+          err?.message ||
+          "Something went wrong while creating the farmer account.",
+      },
+      { status: 500 }
     );
   }
 }
