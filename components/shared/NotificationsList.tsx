@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-const FIXED_ADMIN_ID = "a3506775-faf3-412f-90aa-8d4504a1de63";
+const FIXED_ADMIN_ID = "8642456e-c21c-4fa6-bd46-bed1b5b91bc2";
 
 interface Notif {
   id: string;
